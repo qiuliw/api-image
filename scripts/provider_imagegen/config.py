@@ -48,24 +48,40 @@ def load_provider_config(
 ) -> ProviderConfig:
     override_api_key = resolve_api_key_override(api_key_override, api_key_env)
 
-    api_key = override_api_key
-    if api_key is None:
-        auth = load_json(codex_home / AUTH_FILE_NAME)
-        api_key = auth.get(KEY_FIELD)
-    if not api_key:
-        raise ValueError(f"{KEY_FIELD} is missing in {codex_home / AUTH_FILE_NAME}")
-
-    base_url = base_url_override
-    if base_url is None:
-        config = load_toml(codex_home / CONFIG_FILE_NAME)
+    config_path = codex_home / CONFIG_FILE_NAME
+    provider = {}
+    if base_url_override is None or (override_api_key is None and config_path.exists()):
+        config = load_toml(config_path)
         provider_name = config.get("model_provider")
         if not provider_name:
-            raise ValueError(f"model_provider is missing in {codex_home / CONFIG_FILE_NAME}")
-        providers = config.get("model_providers", {})
-        provider = providers.get(provider_name)
+            raise ValueError(f"model_provider is missing in {config_path}")
+        provider = config.get("model_providers", {}).get(provider_name)
         if not isinstance(provider, dict):
-            raise ValueError(f"Provider '{provider_name}' is missing in {codex_home / CONFIG_FILE_NAME}")
-        base_url = provider.get("base_url")
+            raise ValueError(f"Provider '{provider_name}' is missing in {config_path}")
+
+    api_key = override_api_key
+    if api_key is None:
+        # Provider-scoped credentials must win over unrelated legacy auth.
+        env_key = provider.get("env_key")
+        if env_key:
+            if not isinstance(env_key, str):
+                raise ValueError("Provider env_key must be an environment variable name.")
+            api_key = os.environ.get(env_key, "").strip()
+            if not api_key:
+                raise ValueError(f"Environment variable '{env_key}' is empty or not set.")
+        else:
+            api_key = provider.get("experimental_bearer_token")
+            if api_key is None:
+                auth_path = codex_home / AUTH_FILE_NAME
+                auth = load_json(auth_path) if auth_path.exists() else {}
+                api_key = auth.get(KEY_FIELD)
+    if not isinstance(api_key, str) or not api_key.strip():
+        raise ValueError(
+            "API key is missing: configure provider env_key or experimental_bearer_token, "
+            f"{KEY_FIELD} in auth.json, or --api-key-env/--api-key."
+        )
+    api_key = api_key.strip()
+    base_url = base_url_override if base_url_override is not None else provider.get("base_url")
     if not isinstance(base_url, str) or not base_url.strip():
         raise ValueError("base_url is missing in config or --base-url.")
     return ProviderConfig(api_key=api_key, base_url=normalize_base_url(base_url), codex_home=codex_home)

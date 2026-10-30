@@ -113,3 +113,12 @@ MIT License.
 ## 致谢
 
 感谢 [linuxdo](https://linux.do/) 社区的交流、分享与反馈。
+
+## Provider credential compatibility
+
+Credentials are resolved at runtime in this order: explicit `--api-key` /
+`--api-key-env`, the active provider's `env_key` environment variable, the active
+provider's `experimental_bearer_token`, then `OPENAI_API_KEY` from `auth.json`.
+An explicitly configured but empty `env_key` raises an error instead of falling
+back to a different account. `auth.json` is optional when provider credentials
+are present, including cc-switch configurations. Never print credential values.

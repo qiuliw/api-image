@@ -31,7 +31,7 @@ Routing rule:
    - For purely generic fantasy, mood, simple decoration, or ordinary everyday objects where factual accuracy is not important, search is optional.
    - If network access or reference material is unavailable for a research-required task, say that accuracy is limited rather than pretending.
 4. Read the active provider settings from the user's root files.
-   - Read `auth.json` and use `OPENAI_API_KEY`.
+   - Resolve credentials using the Provider credential compatibility order below; `auth.json` is optional when provider credentials are configured.
    - Read `config.toml`, then use `model_provider` and `[model_providers.<name>].base_url`.
    - Never hardcode a provider URL or API key into the skill.
    - Default to the root files above. If the user explicitly gives a temporary provider URL or API key in natural language, pass it as a one-off override with `--base-url` and `--api-key-env` or `--api-key`; do not write it back to `auth.json`, `config.toml`, README, logs, or generated files.
@@ -314,7 +314,7 @@ Follow the current official GPT Image rules for `gpt-image-2`:
 
 ## Failure Rules
 
-- Raise explicit errors when `OPENAI_API_KEY`, `model_provider`, or `base_url` cannot be found.
+- Raise explicit errors when no supported credential, `model_provider`, or `base_url` can be found.
 - Allow temporary Provider overrides with `--base-url`, `--api-key-env`, or `--api-key`; do not persist them unless explicitly requested.
 - Raise explicit errors when both `--api-key` and `--api-key-env` are provided, when the named environment variable is empty, or when `--base-url` is not an HTTP(S) URL.
 - Raise explicit errors when `size` violates the official GPT Image constraints or `quality` is unsupported.
@@ -327,3 +327,12 @@ Follow the current official GPT Image rules for `gpt-image-2`:
 ## Resource
 
 - `scripts/generate_image.py`: Read the current user's Codex root files, call the configured provider's image endpoint, and save the returned image data.
+
+## Provider credential compatibility
+
+Credentials are resolved at runtime in this order: explicit `--api-key` /
+`--api-key-env`, the active provider's `env_key` environment variable, the active
+provider's `experimental_bearer_token`, then `OPENAI_API_KEY` from `auth.json`.
+An explicitly configured but empty `env_key` raises an error instead of falling
+back to a different account. `auth.json` is optional when provider credentials
+are present, including cc-switch configurations. Never print credential values.
